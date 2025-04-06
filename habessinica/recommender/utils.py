@@ -27,13 +27,15 @@ def generate_user_data():
 
     return user_data, dest_names
 
-def collaborative_filtering(user_interests, k=3):
+def collaborative_filtering(user_interests, k=3, top_n=5):
     if not user_interests:
-        return []  # Return empty list if no interests provided
+        return []
 
+    # Generate simulated user data
     user_data, dest_names = generate_user_data()
-    matrix = np.array(user_data["matrix"])
+    matrix = np.array(user_data["matrix"])  # Shape: (10 users, 10 destinations)
 
+    # Create new_user_vector for input interests
     destinations = Destination.objects.all()
     new_user_vector = []
     for dest in destinations:
@@ -41,19 +43,27 @@ def collaborative_filtering(user_interests, k=3):
             new_user_vector.append(1)
         else:
             new_user_vector.append(0)
-    new_user_vector = np.array([new_user_vector])
+    new_user_vector = np.array([new_user_vector])  # Shape: (1, 10)
 
+    # Fit KNN model
     knn = NearestNeighbors(n_neighbors=min(k, len(matrix)), metric='cosine', algorithm='brute')
     knn.fit(matrix)
 
+    # Find k nearest users
     distances, indices = knn.kneighbors(new_user_vector)
-    similar_users = indices[0]
-    recommended_indices = set()
+    similar_users = indices[0]  # e.g., [4, 1, 7]
+
+    # Score destinations by how many similar users liked them
+    dest_scores = {}
     for user_idx in similar_users:
         user_ratings = matrix[user_idx]
-        recommended_indices.update(np.where(user_ratings == 1)[0])
+        for idx, rating in enumerate(user_ratings):
+            if rating == 1:
+                dest_scores[dest_names[idx]] = dest_scores.get(dest_names[idx], 0) + 1
 
-    recommendations = [dest_names[idx] for idx in recommended_indices]
+    # Sort by score and limit to top_n
+    sorted_recs = sorted(dest_scores.items(), key=lambda x: x[1], reverse=True)
+    recommendations = [rec[0] for rec in sorted_recs[:top_n]]
     return recommendations if recommendations else ["No recommendations found"]
 
 if __name__ == "__main__":
