@@ -2,6 +2,7 @@
 import numpy as np
 from recommender.models import Destination
 from sklearn.neighbors import NearestNeighbors
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 def generate_user_data():
     # Fetch all destinations
@@ -70,6 +71,41 @@ def collaborative_filtering(user_interests, k=3, top_n=5):
     recommendations = [rec[0] for rec in sorted_recs[:top_n]]
     return recommendations if recommendations else ["No recommendations found"]
 
+def get_destination_texts():
+    destinations = Destination.objects.all()
+    texts = []
+    dest_names = []
+    for dest in destinations:
+        # Combine description and interests into one string
+        text = f"{dest.description} {' '.join(dest.interests)}"
+        texts.append(text)
+        dest_names.append(dest.name)
+    return texts, dest_names
+
+def content_based_filtering(user_interests, top_n=5):
+    if not user_interests:
+        return []
+
+    # Get destination texts
+    texts, dest_names = get_destination_texts()
+
+    # Convert user interests to a single string
+    user_query = " ".join(user_interests)
+
+    # Vectorize texts with TF-IDF
+    vectorizer = TfidfVectorizer(stop_words='english')
+    tfidf_matrix = vectorizer.fit_transform(texts)  # Shape: (10 destinations, vocab size)
+    user_vector = vectorizer.transform([user_query])  # Shape: (1, vocab size)
+
+    # Compute cosine similarity
+    from sklearn.metrics.pairwise import cosine_similarity
+    similarities = cosine_similarity(user_vector, tfidf_matrix).flatten()  # Shape: (10,)
+
+    # Get top_n indices by similarity
+    top_indices = similarities.argsort()[-top_n:][::-1]
+    recommendations = [dest_names[idx] for idx in top_indices if similarities[idx] > 0]
+
+    return recommendations if recommendations else ["No recommendations found"]
 
 if __name__ == "__main__":
     user_data, dest_names = generate_user_data()
