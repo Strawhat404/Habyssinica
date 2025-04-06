@@ -45,6 +45,10 @@ def collaborative_filtering(user_interests, k=3, top_n=5):
             new_user_vector.append(0)
     new_user_vector = np.array([new_user_vector])  # Shape: (1, 10)
 
+    # If no matches (all 0s), return no recommendations
+    if not np.any(new_user_vector):
+        return ["No recommendations found"]
+
     # Fit KNN model
     knn = NearestNeighbors(n_neighbors=min(k, len(matrix)), metric='cosine', algorithm='brute')
     knn.fit(matrix)
@@ -65,6 +69,7 @@ def collaborative_filtering(user_interests, k=3, top_n=5):
     sorted_recs = sorted(dest_scores.items(), key=lambda x: x[1], reverse=True)
     recommendations = [rec[0] for rec in sorted_recs[:top_n]]
     return recommendations if recommendations else ["No recommendations found"]
+
 
 if __name__ == "__main__":
     user_data, dest_names = generate_user_data()
