@@ -1,8 +1,13 @@
 # recommender/utils.py
 import numpy as np
+from pyowm import OWM
+import datetime
+
+from django.conf import settings
 from recommender.models import Destination
 from sklearn.neighbors import NearestNeighbors
 from sklearn.feature_extraction.text import TfidfVectorizer
+
 
 def generate_user_data():
     # Fetch all destinations
@@ -106,6 +111,35 @@ def content_based_filtering(user_interests, top_n=5):
     recommendations = [dest_names[idx] for idx in top_indices if similarities[idx] > 0]
 
     return recommendations if recommendations else ["No recommendations found"]
+
+
+def is_season_match(dest_season, travel_date=None):
+    # Map season strings to months
+    season_months = {
+        "Oct-Feb": range(10, 13),  # Oct-Dec (wraps to next year)
+        "Nov-Jan": range(11, 13),  # Nov-Dec (wraps to next year)
+        "Year-round": range(1, 13),
+    }
+    # Handle year-wrap for Oct-Feb and Nov-Jan
+    if dest_season == "Oct-Feb":
+        return travel_date.month in [10, 11, 12] or travel_date.month in [1, 2]
+    elif dest_season == "Nov-Jan":
+        return travel_date.month in [11, 12] or travel_date.month == 1
+    elif dest_season == "Year-round":
+        return True
+    return False
+
+def get_weather(location, api_key):
+    owm = OWM(api_key)
+    mgr = owm.weather_manager()
+    try:
+        observation = mgr.weather_at_place(location + ",ET")  # ET = Ethiopia
+        weather = observation.weather
+        temp = weather.temperature('celsius')['temp']
+        status = weather.status.lower()  # e.g., "clear", "rain"
+        return temp > 15 and "rain" not in status  # Simple "good weather" check
+    except Exception:
+        return True  # Fallback to True if API fails
 
 if __name__ == "__main__":
     user_data, dest_names = generate_user_data()
