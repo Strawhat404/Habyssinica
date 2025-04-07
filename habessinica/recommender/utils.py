@@ -1,13 +1,12 @@
 # recommender/utils.py
 import numpy as np
-from pyowm import OWM
-import datetime
-
 from django.conf import settings
 from recommender.models import Destination
 from sklearn.neighbors import NearestNeighbors
 from sklearn.feature_extraction.text import TfidfVectorizer
-
+from sklearn.metrics.pairwise import cosine_similarity
+from pyowm import OWM
+import datetime
 
 def generate_user_data():
     # Fetch all destinations
@@ -33,7 +32,6 @@ def generate_user_data():
 
     return user_data, dest_names
 
-# Replace collaborative_filtering
 def collaborative_filtering(user_interests, travel_date=None, k=3, top_n=5):
     if not user_interests:
         return []
@@ -68,7 +66,7 @@ def collaborative_filtering(user_interests, travel_date=None, k=3, top_n=5):
                 # Apply seasonal filter if travel_date provided
                 if travel_date and not is_season_match(dest.season, travel_date):
                     continue
-                # Optional: Check weather (uncomment if API key ready)
+                # Check weather (uncomment when API key is ready)
                 # if not get_weather(dest.location, settings.OPENWEATHER_API_KEY):
                 #     continue
                 dest_scores[dest_names[idx]] = dest_scores.get(dest_names[idx], 0) + 1
@@ -77,7 +75,17 @@ def collaborative_filtering(user_interests, travel_date=None, k=3, top_n=5):
     recommendations = [rec[0] for rec in sorted_recs[:top_n]]
     return recommendations if recommendations else ["No recommendations found"]
 
-# Replace content_based_filtering
+def get_destination_texts():
+    destinations = Destination.objects.all()
+    texts = []
+    dest_names = []
+    for dest in destinations:
+        # Combine description and interests into one string
+        text = f"{dest.description} {' '.join(dest.interests)}"
+        texts.append(text)
+        dest_names.append(dest.name)
+    return texts, dest_names
+
 def content_based_filtering(user_interests, travel_date=None, top_n=5):
     if not user_interests:
         return []
@@ -99,50 +107,14 @@ def content_based_filtering(user_interests, travel_date=None, top_n=5):
             # Apply seasonal filter if travel_date provided
             if travel_date and not is_season_match(dest.season, travel_date):
                 continue
-            # Optional: Check weather (uncomment if API key ready)
-            if not get_weather(dest.location, settings.OPENWEATHER_API_KEY):
-                continue
+            # Check weather (uncomment when API key is ready)
+            # if not get_weather(dest.location, settings.OPENWEATHER_API_KEY):
+            #     continue
             recommendations.append(dest_names[idx])
             if len(recommendations) >= top_n:
                 break
 
     return recommendations if recommendations else ["No recommendations found"]
-def get_destination_texts():
-    destinations = Destination.objects.all()
-    texts = []
-    dest_names = []
-    for dest in destinations:
-        # Combine description and interests into one string
-        text = f"{dest.description} {' '.join(dest.interests)}"
-        texts.append(text)
-        dest_names.append(dest.name)
-    return texts, dest_names
-
-def content_based_filtering(user_interests, top_n=5):
-    if not user_interests:
-        return []
-
-    # Get destination texts
-    texts, dest_names = get_destination_texts()
-
-    # Convert user interests to a single string
-    user_query = " ".join(user_interests)
-
-    # Vectorize texts with TF-IDF
-    vectorizer = TfidfVectorizer(stop_words='english')
-    tfidf_matrix = vectorizer.fit_transform(texts)  # Shape: (10 destinations, vocab size)
-    user_vector = vectorizer.transform([user_query])  # Shape: (1, vocab size)
-
-    # Compute cosine similarity
-    from sklearn.metrics.pairwise import cosine_similarity
-    similarities = cosine_similarity(user_vector, tfidf_matrix).flatten()  # Shape: (10,)
-
-    # Get top_n indices by similarity
-    top_indices = similarities.argsort()[-top_n:][::-1]
-    recommendations = [dest_names[idx] for idx in top_indices if similarities[idx] > 0]
-
-    return recommendations if recommendations else ["No recommendations found"]
-
 
 def is_season_match(dest_season, travel_date=None):
     # Map season strings to months
@@ -152,6 +124,8 @@ def is_season_match(dest_season, travel_date=None):
         "Year-round": range(1, 13),
     }
     # Handle year-wrap for Oct-Feb and Nov-Jan
+    if travel_date is None:
+        return True  # No date provided, assume match
     if dest_season == "Oct-Feb":
         return travel_date.month in [10, 11, 12] or travel_date.month in [1, 2]
     elif dest_season == "Nov-Jan":
