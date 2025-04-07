@@ -108,8 +108,8 @@ def content_based_filtering(user_interests, travel_date=None, top_n=5):
             if travel_date and not is_season_match(dest.season, travel_date):
                 continue
             # Check weather (uncomment when API key is ready)
-            # if not get_weather(dest.location, settings.OPENWEATHER_API_KEY):
-            #     continue
+            if not get_weather(dest.location, settings.OPENWEATHER_API_KEY):
+                continue
             recommendations.append(dest_names[idx])
             if len(recommendations) >= top_n:
                 break
