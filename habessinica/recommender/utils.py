@@ -33,15 +33,14 @@ def generate_user_data():
 
     return user_data, dest_names
 
-def collaborative_filtering(user_interests, k=3, top_n=5):
+# Replace collaborative_filtering
+def collaborative_filtering(user_interests, travel_date=None, k=3, top_n=5):
     if not user_interests:
         return []
 
-    # Generate simulated user data
     user_data, dest_names = generate_user_data()
-    matrix = np.array(user_data["matrix"])  # Shape: (10 users, 10 destinations)
+    matrix = np.array(user_data["matrix"])
 
-    # Create new_user_vector for input interests
     destinations = Destination.objects.all()
     new_user_vector = []
     for dest in destinations:
@@ -49,33 +48,65 @@ def collaborative_filtering(user_interests, k=3, top_n=5):
             new_user_vector.append(1)
         else:
             new_user_vector.append(0)
-    new_user_vector = np.array([new_user_vector])  # Shape: (1, 10)
+    new_user_vector = np.array([new_user_vector])
 
-    # If no matches (all 0s), return no recommendations
     if not np.any(new_user_vector):
         return ["No recommendations found"]
 
-    # Fit KNN model
     knn = NearestNeighbors(n_neighbors=min(k, len(matrix)), metric='cosine', algorithm='brute')
     knn.fit(matrix)
 
-    # Find k nearest users
     distances, indices = knn.kneighbors(new_user_vector)
-    similar_users = indices[0]  # e.g., [4, 1, 7]
+    similar_users = indices[0]
 
-    # Score destinations by how many similar users liked them
     dest_scores = {}
     for user_idx in similar_users:
         user_ratings = matrix[user_idx]
         for idx, rating in enumerate(user_ratings):
             if rating == 1:
+                dest = destinations[idx]
+                # Apply seasonal filter if travel_date provided
+                if travel_date and not is_season_match(dest.season, travel_date):
+                    continue
+                # Optional: Check weather (uncomment if API key ready)
+                # if not get_weather(dest.location, settings.OPENWEATHER_API_KEY):
+                #     continue
                 dest_scores[dest_names[idx]] = dest_scores.get(dest_names[idx], 0) + 1
 
-    # Sort by score and limit to top_n
     sorted_recs = sorted(dest_scores.items(), key=lambda x: x[1], reverse=True)
     recommendations = [rec[0] for rec in sorted_recs[:top_n]]
     return recommendations if recommendations else ["No recommendations found"]
 
+# Replace content_based_filtering
+def content_based_filtering(user_interests, travel_date=None, top_n=5):
+    if not user_interests:
+        return []
+
+    texts, dest_names = get_destination_texts()
+    destinations = Destination.objects.all()
+
+    vectorizer = TfidfVectorizer(stop_words='english')
+    tfidf_matrix = vectorizer.fit_transform(texts)
+    user_vector = vectorizer.transform([" ".join(user_interests)])
+
+    similarities = cosine_similarity(user_vector, tfidf_matrix).flatten()
+    top_indices = similarities.argsort()[::-1]
+    
+    recommendations = []
+    for idx in top_indices:
+        if similarities[idx] > 0:
+            dest = destinations[idx]
+            # Apply seasonal filter if travel_date provided
+            if travel_date and not is_season_match(dest.season, travel_date):
+                continue
+            # Optional: Check weather (uncomment if API key ready)
+            if not get_weather(dest.location, settings.OPENWEATHER_API_KEY):
+                continue
+            recommendations.append(dest_names[idx])
+            if len(recommendations) >= top_n:
+                break
+
+    return recommendations if recommendations else ["No recommendations found"]
 def get_destination_texts():
     destinations = Destination.objects.all()
     texts = []
