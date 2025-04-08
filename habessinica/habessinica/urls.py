@@ -14,10 +14,13 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+# habessinica/urls.py
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path
+from recommender.views import CollaborativeRecommendView, ContentRecommendView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include('recommender.urls')),
+    path('api/recommend/collaborative/', CollaborativeRecommendView.as_view(), name='collaborative_recommend'),
+    path('api/recommend/content/', ContentRecommendView.as_view(), name='content_recommend'),
 ]
