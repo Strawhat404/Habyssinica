@@ -98,7 +98,7 @@ def content_based_filtering(user_interests, travel_date=None, top_n=5):
     user_vector = vectorizer.transform([" ".join(user_interests)])
 
     similarities = cosine_similarity(user_vector, tfidf_matrix).flatten()
-    top_indices = similarities.argsort()[::-1]
+    top_indices = similarities.argsort()[::-1].tolist()  # Convert to Python list
     
     recommendations = []
     for idx in top_indices:
