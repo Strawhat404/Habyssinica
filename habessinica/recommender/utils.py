@@ -155,3 +155,31 @@ if __name__ == "__main__":
     test_interests = ["history", "culture"]
     recs = collaborative_filtering(test_interests)
     print(f"Recommendations for {test_interests}: {recs}")
+    
+
+def hybrid_recommend(user_interests, travel_date=None, top_n=5, knn_weight=0.6, tfidf_weight=0.4):
+    if not user_interests:
+        return []
+
+    # Get recommendations from both methods
+    knn_recs = collaborative_filtering(user_interests, travel_date, top_n=10)  # Get more to merge
+    tfidf_recs = content_based_filtering(user_interests, travel_date, top_n=10)
+
+    # Handle no recommendations case
+    if knn_recs == ["No recommendations found"] and tfidf_recs == ["No recommendations found"]:
+        return ["No recommendations found"]
+
+    # Assign scores based on rank (higher rank = higher score)
+    knn_scores = {rec: (10 - i) * knn_weight for i, rec in enumerate(knn_recs) if rec != "No recommendations found"}
+    tfidf_scores = {rec: (10 - i) * tfidf_weight for i, rec in enumerate(tfidf_recs) if rec != "No recommendations found"}
+
+    # Combine scores
+    combined_scores = {}
+    for rec in set(knn_scores.keys()).union(tfidf_scores.keys()):
+        combined_scores[rec] = knn_scores.get(rec, 0) + tfidf_scores.get(rec, 0)
+
+    # Sort by combined score and limit to top_n
+    sorted_recs = sorted(combined_scores.items(), key=lambda x: x[1], reverse=True)
+    recommendations = [rec[0] for rec in sorted_recs[:top_n]]
+
+    return recommendations if recommendations else ["No recommendations found"]
