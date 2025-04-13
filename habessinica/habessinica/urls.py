@@ -17,10 +17,11 @@ Including another URLconf
 # habessinica/urls.py
 from django.contrib import admin
 from django.urls import path
-from recommender.views import CollaborativeRecommendView, ContentRecommendView
+from recommender.views import CollaborativeRecommendView, ContentRecommendView,HybridRecommendView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/recommend/collaborative/', CollaborativeRecommendView.as_view(), name='collaborative_recommend'),
     path('api/recommend/content/', ContentRecommendView.as_view(), name='content_recommend'),
+    path('api/recommend/hybrid/', HybridRecommendView.as_view(), name='hybrid_recommend'),
 ]

@@ -40,3 +40,21 @@ class ContentRecommendView(APIView):
         destinations = Destination.objects.filter(name__in=rec_names)
         serializer = DestinationSerializer(destinations, many=True)
         return Response({"recommendations": serializer.data}, status=status.HTTP_200_OK)
+    
+
+class HybridRecommendView(APIView):
+    def get(self, request):
+        interests = request.query_params.get('interests', '').split(',')
+        travel_date_str = request.query_params.get('travel_date', None)
+        travel_date = datetime.strptime(travel_date_str, '%Y-%m-%d') if travel_date_str else None
+
+        if not interests or interests == ['']:
+            return Response({"recommendations": []}, status=status.HTTP_200_OK)
+
+        rec_names = hybrid_recommend(interests, travel_date)
+        if rec_names == ["No recommendations found"]:
+            return Response({"recommendations": []}, status=status.HTTP_200_OK)
+
+        destinations = Destination.objects.filter(name__in=rec_names)
+        serializer = DestinationSerializer(destinations, many=True)
+        return Response({"recommendations": serializer.data}, status=status.HTTP_200_OK)
